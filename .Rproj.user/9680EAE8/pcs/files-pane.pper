@@ -1,0 +1,9 @@
+{
+    "path" : "~/GitHub/rus_traffic_accidents",
+    "sortOrder" : [
+        {
+            "ascending" : true,
+            "columnIndex" : 2
+        }
+    ]
+}

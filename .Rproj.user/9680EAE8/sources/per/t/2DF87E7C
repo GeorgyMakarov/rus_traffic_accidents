@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1588311887675.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2891691260",
+    "id" : "2DF87E7C",
+    "lastKnownWriteTime" : 1588316120,
+    "last_content_update" : 1588316120111,
+    "path" : "~/GitHub/rus_traffic_accidents/project_script.Rmd",
+    "project_path" : "project_script.Rmd",
+    "properties" : {
+        "cursorPosition" : "42,0",
+        "scrollLine" : "11",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
