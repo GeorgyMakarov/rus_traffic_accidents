@@ -1,14 +1,14 @@
 ---
 title: "Predicting traffic accidents in Russia"
 author: "Georgy Makarov"
-date: 'May 1, 2020'
+date: 'May 28, 2020'
 output: 
     html_document:
             keep_md: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
@@ -33,12 +33,92 @@ This research is based on the data for Saint-Petersburg, Russia.
 
 Ideal data set has to include both weather and traffic conditions. Weather
 conditions include variables: air temperature, road temperature, rain, snow, 
-ice, fog. Traffic conditions include variables: date, time, logitude, latitude,
+ice, fog. Traffic conditions include variables: date, time, longitude, latitude,
 type of accident, road type, place type, road condition, road lights, number of
 vehicles, number of participants, fatal, injury, class of vehicles, model of 
 vehicles, category of participants, sex of participants, cause of accident.
 
 ## Available data
 
+We downloand the data from official [police](http://stat.gibdd.ru). It 
+contains the following columns: type of accident, date, city district, info
+about an accident, number of vehicles, number of participants, ID of an 
+accident, fatalities, injured, time of an accident. The column with the info
+about an accident is a string without separators, which might contain other
+desired parameters like temperature, rain, snow etc.
+
+## Prerequisite packages
+
+```{r libs, echo=TRUE}
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(XML)
+```
+
+## Get the data
+
+Downloand from the official police source is available in *.xml* format. We 
+downlaod the data for 2019. The data was broken by 14 days intervals by police
+server. Total 2019 is 22 files - the data for December is not available yet. 
+
+```{r list_files}
+files <- list.files("./raw_data")
+files <- as.list(files)
+length(files)
+```
+
+We download them with the loop:
+
+```{r download, echo=TRUE}
+setwd("./raw_data")
+list_file <- list.files(pattern = "*.xml") %>% 
+    lapply(xmlToDataFrame, stringsAsFactors = F) %>% bind_rows
+setwd("C:/Users/Георгий/Documents/GitHub/rus_traffic_accidents/")
+```
+
+## Clean the data
+
+The data file contains general information: region of observations, official
+government data, government classifications. Those are not desired in the 
+dataset. We filter the rows, which contain *NA* on *DTPV* column. Column *text* 
+does not contain any information at all and returns *NA*. We delete this column
+from the dataset. Then we arrange the data by the date and time of accident.
+
+```{r clean1}
+list_file <- list_file %>% 
+    filter(!(is.na(DTPV))) %>% select(-text)
+list_file$date <- dmy(list_file$date)
+list_file$time <- as.POSIXct(list_file$time, format = "%H:%M")
+xmldf <- list_file %>% arrange(date, time)
+rm(list_file)
+dim(xmldf)
+```
+
+The columns KTS, KUCH, POG, RAN are characters. They need to be
+transformed to numbers.
+
+```{r firs_sumry}
+summary(xmldf)
+```
+
+```{r trans1}
+xmldf$KTS <- as.numeric(xmldf$KTS)
+xmldf$KUCH <- as.numeric(xmldf$KUCH)
+xmldf$POG <- as.numeric(xmldf$POG)
+xmldf$RAN <- as.numeric(xmldf$RAN)
+```
+
+```{r sec_sumry}
+summary(xmldf)
+```
+
+Check missing values in the data frame:
+
+```{r check_na}
+sum(complete.cases(xmldf))
+```
 
 
