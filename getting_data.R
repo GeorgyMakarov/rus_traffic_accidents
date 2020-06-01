@@ -1,58 +1,4 @@
----
-title: "Predicting traffic accidents in Russia"
-author: "Georgy Makarov"
-date: 'May 28, 2020'
-output: 
-    html_document:
-            keep_md: true
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(message = FALSE)
-knitr::opts_chunk$set(warning = FALSE)
-```
-
-## Introduction
-
-Traffic accidents in Russia caused 16981 deaths and 210877 injuries in 2019 
-according to official statistics. Russian government had developed a strategy
-to reduce the number of traffic accidents in 2016. The strategy targets 1.5 - 2
-deaths per 100000 population by the end of 2024. While much effort has focused
-on predicting whether Russia is able to reach the assigned level, what 
-influences the severity of traffic accident remains unknown.
-
-There are a variety of weather and traffic conditions that contribute to 
-accidents. This paper attempts to find out if we could use quantitative 
-characteristics to predict the severity of traffic accident in Russia?
-
-This research is based on the data for Saint-Petersburg, Russia.
-
-
-## Desired data
-
-Ideal data set has to include both weather and traffic conditions. Weather
-conditions include variables: air temperature, road temperature, rain, snow, 
-ice, fog. Traffic conditions include variables: date, time, longitude, latitude,
-type of accident, road type, place type, road condition, road lights, number of
-vehicles, number of participants, fatal, injury, class of vehicles, model of 
-vehicles, category of participants, sex of participants, cause of accident.
-
-## Available data
-
-We downloand the data from official [police site](http://stat.gibdd.ru). Police 
-describes each accident in unique accident card. It contains the following data: 
-type of accident, date, city district, info about an accident, number of 
-vehicles, number of participants, ID of an accident, fatalities, injured, 
-time of an accident etc. The data is available in *.pdf*, *.xls*, *.csv*, *.xml*
-formats. We use *.csv* and *.xml* files, because we cannot read the data from
-*.pdf* files and *.xls* files representation is not suitable for automated 
-reading. Each card is given as separate spreadsheet in one file and different
-number of rows and columns.
-
-## Prerequisite packages
-
-```{r libs, echo=TRUE}
+# Prerequisite libraries
 library(reshape2)
 library(ggplot2)
 library(dplyr)
@@ -62,16 +8,8 @@ library(XML)
 library(readr)
 library(stringi)
 library(stringr)
-```
 
-## Get the data
-
-We start from reading in *.xml* format. We downlaod the data for 2019. The data 
-was broken by 14 days intervals by police server. Total 2019 is 22 files. It 
-covers the period from January 1, 2019 to November 26, 2019. The data for 
-December is not available yet.
-
-```{r download_xml}
+# loop for reading .xml files
 files <- list.files("./raw_data")
 files <- as.list(files)
 
@@ -79,52 +17,40 @@ setwd("./raw_data")
 list_file <- list.files(pattern = "*.xml") %>% 
     lapply(xmlToDataFrame, stringsAsFactors = F) %>% bind_rows
 setwd("C:/Users/Георгий/Documents/GitHub/rus_traffic_accidents/")
-```
 
-Each accident cards starts from a description of region and a name of the
-document. This is not relevant to our research - we filter rows, which contain
-that information. We also tranform the date to *date - month - year* format and
-time to *time* format. Then we arrange the data by date, time, type of accident,
-district of accident - we need these columns to create a key later.
 
-```{r filter1}
+# filter rows in the top of the table - they contain general info not needed
+# for the analysis, because this infor tells us about region - St. Pete, but we
+# already have filtered St. Pete.
+
 list_file <- list_file %>% 
     filter(!(is.na(DTPV))) %>% select(-text)
 list_file$date <- dmy(list_file$date)
 list_file$time <- as.POSIXct(list_file$time, format = "%H:%M")
 xmldf <- list_file %>% arrange(date, time, DTPV, district)
 rm(list_file)
-```
 
-Summary of the dataset shows that columns *KTS*, *KUCH*, *POG*, *RAN* downloaded
-as characters, while they are numeric values. 
-
-```{r summary1}
+# check data summary
+# need to transfor to num: KTS, KUCH, POG, RAN
 summary(xmldf)
-```
 
-We tranform those to numeric.
-
-```{r transform1}
+# transform columns to numeric
 xmldf$KTS <- as.numeric(xmldf$KTS)
 xmldf$KUCH <- as.numeric(xmldf$KUCH)
 xmldf$POG <- as.numeric(xmldf$POG)
 xmldf$RAN <- as.numeric(xmldf$RAN)
-```
 
-Check if there are missing values in the dataset after all transformations.
 
-```{r check_na1}
+# write data description file
+# check for correlation between variables
+
+# check for NA values in each column
+
 sum(complete.cases(xmldf))
-```
 
-Column *infoDtp* contains descriptions of accidents: weather conditions, road
-conditions, coordinates etc. Each description is a string with no delimiters
-and different length. The order of description items differs by lines also.
-This limits our ability to get the data from the column. We start from getting
-driving mode after an accident, road type and coordinates.
+# split infoDtp to columns
 
-```{r infoDtp}
+## create column to describe the driving mode after the accident
 driving_mode <- xmldf %>% 
     separate(infoDtp, into = c("text1"), 
              sep = "([:digit:]+\\.[:digit:]+\\.[:digit:]+)")
@@ -137,6 +63,7 @@ xmldf <- cbind(xmldf, driving_mode)
 xmldf$driving_mode <- xmldf$text1
 xmldf <- xmldf %>% select(-text1)
 
+## extract coordinates from infoDtp
 coords_dtp <- xmldf %>% 
     select(date, infoDtp) %>% 
     extract(infoDtp, c("text1"), 
@@ -146,6 +73,8 @@ coords_dtp <- xmldf %>%
 xmldf <- cbind(xmldf, coords_dtp)
 xmldf$coords_dtp <- xmldf$text1
 xmldf <- xmldf %>% select(-text1)
+
+## extract road type from infoDtp
 
 road_type <- xmldf %>% select(infoDtp) %>% 
     separate(infoDtp, into = c("text1", "text2"), 
@@ -159,19 +88,11 @@ road_type <- road_type %>%
     extract(text1, c("text1"), "([:alnum:]+[:alnum:]+)", remove = TRUE)
 
 xmldf$road_type <- road_type$text1
-```
 
-This is as far as we could get with sensible regular expressions - there should
-be a more simple way to get the required data. We found out that *.csv* files
-contain some of the information from accidents card in a format that we could
-use for our analysis. The idea is to create a dataset with weather and road
-conditions and join it with the first dataset on a key. The key is the date, 
-time, type of accident and a district.
+## read .csv files and create second dataset - use this dataset to obtain:
+## latitude, longitude, road category, road condition, weather condition
+## merging two datasets on artificial key: date time dtpv district
 
-We download *.csv* files and merge them. Then make the columns and join both
-datasets.
-
-```{r leftjoin1}
 ### read all the csv files
 
 setwd("./csv_data")
@@ -229,11 +150,7 @@ raw_data_sel <- raw_data %>% select(key.1 = key, latitude, longitude, road_cat,
 
 d2 <- cbind(xmldf, raw_data_sel)
 rm(list_file, xmldf, raw_data, raw_data_sel)
-```
 
-Then we kick temporary columns and write the file as our raw data.
-
-```{r write_raw}
 ### kick temporary columns
 
 d2 <- d2 %>% select(dtpv = DTPV, date, time, district, kts = KTS, kuch = KUCH, 
@@ -243,7 +160,3 @@ d2 <- d2 %>% select(dtpv = DTPV, date, time, district, kts = KTS, kuch = KUCH,
 # save raw data
 
 write.csv(d2, "raw_data.csv")
-```
-
-## Cleaning data
-
