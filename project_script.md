@@ -61,7 +61,7 @@ library(stringi)
 library(stringr)
 ```
 
-## Get the data
+## Get data
 
 We start from reading in *.xml* format. We downlaod the data for 2019. The data 
 was broken by 14 days intervals by police server. Total 2019 is 22 files. It 
@@ -103,30 +103,6 @@ as characters, while they are numeric values.
 summary(xmldf)
 ```
 
-```
-##      DTPV                date              district           infoDtp         
-##  Length:5860        Min.   :2019-01-01   Length:5860        Length:5860       
-##  Class :character   1st Qu.:2019-04-11   Class :character   Class :character  
-##  Mode  :character   Median :2019-06-28   Mode  :character   Mode  :character  
-##                     Mean   :2019-06-24                                        
-##                     3rd Qu.:2019-09-11                                        
-##                     Max.   :2019-11-26                                        
-##      KTS                KUCH              kartId              POG           
-##  Length:5860        Length:5860        Length:5860        Length:5860       
-##  Class :character   Class :character   Class :character   Class :character  
-##  Mode  :character   Mode  :character   Mode  :character   Mode  :character  
-##                                                                             
-##                                                                             
-##                                                                             
-##      RAN               rowNum               time                    
-##  Length:5860        Length:5860        Min.   :2020-06-01 00:00:00  
-##  Class :character   Class :character   1st Qu.:2020-06-01 10:20:00  
-##  Mode  :character   Mode  :character   Median :2020-06-01 15:00:00  
-##                                        Mean   :2020-06-01 14:22:47  
-##                                        3rd Qu.:2020-06-01 19:00:00  
-##                                        Max.   :2020-06-01 23:59:00
-```
-
 We tranform those to numeric.
 
 
@@ -142,10 +118,6 @@ Check if there are missing values in the dataset after all transformations.
 
 ```r
 sum(complete.cases(xmldf))
-```
-
-```
-## [1] 5860
 ```
 
 Column *infoDtp* contains descriptions of accidents: weather conditions, road
@@ -251,13 +223,6 @@ set_xml <- xmldf
 d1 <- data.frame(set_raw, set_xml)
 d1$check <- d1$key == d1$key.1
 sum(d1$check == TRUE)
-```
-
-```
-## [1] 5860
-```
-
-```r
 rm(set_raw, set_xml, d1)
 rm(files, coords_dtp, driving_mode, road_type)
 
@@ -285,5 +250,33 @@ d2 <- d2 %>% select(dtpv = DTPV, date, time, district, kts = KTS, kuch = KUCH,
 write.csv(d2, "raw_data.csv")
 ```
 
-## Cleaning data
+## Desired data vs available data
+
+|desired data 			| available data 			| check 
+|-----------------------|---------------------------|------
+|air temperature		| air temperature			| no  
+|road temperature		| road temperature			| no  
+|rain, snow, ice, fog	| rain, snow, ice, fog		| yes  
+|date					| date						| yes  
+|time					| time						| yes  
+|lognitude				| lognitude					| yes  
+|latitude				| latitude					| yes  
+|type of accident		| type of accident			| yes  
+|road type				| road type					| yes  
+|place type				| place type				| yes  
+|road condition			| road condition			| yes  
+|road lights			| road lights				| yes  
+|number of vehicles		| number of vehicles		| yes  
+|number of participants	| number of participants	| yes  
+|fatal					| fatal						| yes  
+|injury					| injury					| yes  
+|class of vehicles		| class of vehicles			| no  
+|model of vehicles		| model of vehicles			| no  
+|category of participant| category of participant	| no  
+|sex of participants	| sex of participants		| no  
+|cause of accident		| cause of accident			| no  
+|weather condition		| weather condition			| yes  
+
+
+
 

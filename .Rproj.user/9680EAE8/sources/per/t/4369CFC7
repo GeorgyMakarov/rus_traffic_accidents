@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1591084631033.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1415282585",
+    "id" : "4369CFC7",
+    "lastKnownWriteTime" : 1591088855,
+    "last_content_update" : 1591088855913,
+    "path" : "~/GitHub/rus_traffic_accidents/explore_data.R",
+    "project_path" : "explore_data.R",
+    "properties" : {
+        "cursorPosition" : "38,13",
+        "scrollLine" : "7",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

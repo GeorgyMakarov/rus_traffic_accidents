@@ -64,14 +64,14 @@ library(stringi)
 library(stringr)
 ```
 
-## Get the data
+## Get data
 
 We start from reading in *.xml* format. We downlaod the data for 2019. The data 
 was broken by 14 days intervals by police server. Total 2019 is 22 files. It 
 covers the period from January 1, 2019 to November 26, 2019. The data for 
 December is not available yet.
 
-```{r download_xml}
+```{r download_xml, eval=FALSE}
 files <- list.files("./raw_data")
 files <- as.list(files)
 
@@ -87,7 +87,7 @@ that information. We also tranform the date to *date - month - year* format and
 time to *time* format. Then we arrange the data by date, time, type of accident,
 district of accident - we need these columns to create a key later.
 
-```{r filter1}
+```{r filter1, eval=FALSE}
 list_file <- list_file %>% 
     filter(!(is.na(DTPV))) %>% select(-text)
 list_file$date <- dmy(list_file$date)
@@ -99,13 +99,13 @@ rm(list_file)
 Summary of the dataset shows that columns *KTS*, *KUCH*, *POG*, *RAN* downloaded
 as characters, while they are numeric values. 
 
-```{r summary1}
+```{r summary1, eval=FALSE}
 summary(xmldf)
 ```
 
 We tranform those to numeric.
 
-```{r transform1}
+```{r transform1, eval=FALSE}
 xmldf$KTS <- as.numeric(xmldf$KTS)
 xmldf$KUCH <- as.numeric(xmldf$KUCH)
 xmldf$POG <- as.numeric(xmldf$POG)
@@ -114,7 +114,7 @@ xmldf$RAN <- as.numeric(xmldf$RAN)
 
 Check if there are missing values in the dataset after all transformations.
 
-```{r check_na1}
+```{r check_na1, eval=FALSE}
 sum(complete.cases(xmldf))
 ```
 
@@ -124,7 +124,7 @@ and different length. The order of description items differs by lines also.
 This limits our ability to get the data from the column. We start from getting
 driving mode after an accident, road type and coordinates.
 
-```{r infoDtp}
+```{r infoDtp, eval=FALSE}
 driving_mode <- xmldf %>% 
     separate(infoDtp, into = c("text1"), 
              sep = "([:digit:]+\\.[:digit:]+\\.[:digit:]+)")
@@ -171,7 +171,7 @@ time, type of accident and a district.
 We download *.csv* files and merge them. Then make the columns and join both
 datasets.
 
-```{r leftjoin1}
+```{r leftjoin1, eval=FALSE}
 ### read all the csv files
 
 setwd("./csv_data")
@@ -233,7 +233,7 @@ rm(list_file, xmldf, raw_data, raw_data_sel)
 
 Then we kick temporary columns and write the file as our raw data.
 
-```{r write_raw}
+```{r write_raw, eval=FALSE}
 ### kick temporary columns
 
 d2 <- d2 %>% select(dtpv = DTPV, date, time, district, kts = KTS, kuch = KUCH, 
@@ -245,5 +245,36 @@ d2 <- d2 %>% select(dtpv = DTPV, date, time, district, kts = KTS, kuch = KUCH,
 write.csv(d2, "raw_data.csv")
 ```
 
-## Cleaning data
+## Desired data vs available data
+
+|desired data 			| available data 			| check 
+|-----------------------|---------------------------|------
+|air temperature		| air temperature			| no  
+|road temperature		| road temperature			| no  
+|rain, snow, ice, fog	| rain, snow, ice, fog		| yes  
+|date					| date						| yes  
+|time					| time						| yes  
+|lognitude				| lognitude					| yes  
+|latitude				| latitude					| yes  
+|type of accident		| type of accident			| yes  
+|road type				| road type					| yes  
+|place type				| place type				| yes  
+|road condition			| road condition			| yes  
+|road lights			| road lights				| yes  
+|number of vehicles		| number of vehicles		| yes  
+|number of participants	| number of participants	| yes  
+|fatal					| fatal						| yes  
+|injury					| injury					| yes  
+|class of vehicles		| class of vehicles			| no  
+|model of vehicles		| model of vehicles			| no  
+|category of participant| category of participant	| no  
+|sex of participants	| sex of participants		| no  
+|cause of accident		| cause of accident			| no  
+|weather condition		| weather condition			| yes  
+
+## Translate data
+
+
+
+
 
