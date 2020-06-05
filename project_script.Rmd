@@ -275,6 +275,9 @@ write.csv(d2, "raw_data.csv")
 ## Translate data
 
 
+## Exploratory data analysis
+
+In 2019 
 
 
 

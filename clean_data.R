@@ -91,7 +91,7 @@ raw_data$road_cat <- plyr::revalue(raw_data$road_cat,
 unique(raw_data$road_cond)
 
 raw_data$road_cond <- plyr::revalue(raw_data$road_cond,
-                                    c("Обработанное противогололедными материалами" = "de_iced",
+                                    c("Обработанное противогололедными материалами" = "wet",
                                       "Заснеженное" = "snow", "Мокрое" = "wet", 
                                       "Загрязненное" = "dirty", "Пасмурно" = "unknown",
                                       "Ясно" = "unknown", "Снегопад" = "snow", "Сухое" = "dry",
