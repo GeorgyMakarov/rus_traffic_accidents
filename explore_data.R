@@ -78,13 +78,76 @@ ggplot(sev_rate, aes(kts, dtpv, fill = severity)) +
 # map of serious and moderate accidents
 
 library(plotly)
+df <- sev_rate
+
+# geo styling
 fig <- sev_rate
-fig <- fig %>%
+fig <- fig %>% 
     plot_ly(
         type = 'densitymapbox',
-        lat = ~ latitude,
-        lon = ~ longitude,
-        coloraxis = 'severity',
-        radius = 10)
-
+        lat = ~longitude,
+        lon = ~latitude,
+        coloraxis = 'coloraxis',
+        radius = 10
+    )
+fig <- fig %>% 
+    layout(
+        mapbox = list(
+            style = "open-street-map",
+            center = list(lon = 30, lat = 59)), coloraxis = list(colorscale = "Viridis")
+    )
 fig
+
+# bubble map
+
+g <- list(
+    scope = 'europe', resolution = 50, showcountries = TRUE,
+    showland = TRUE, landcolor = "lightgreen",
+    showlakes = TRUE, lakecolor = "lightblue",
+    showocean = TRUE, oceancolor = "lightblue",
+    showrivers = TRUE, rivercolor = "blue",
+    style = 'open-street-map',
+    subunitwidth = 1,
+    countrywidth = 1,
+    subunitcolor = toRGB("white"),
+    countrycolor = toRGB("white")
+)
+
+fig <- plot_geo(df, locationmode = 'USA-states', sizes = c(1, 250))
+fig <- fig %>% add_markers(
+    x = ~latitude, y = ~longitude, size = ~casualties, color = ~severity
+)
+fig <- fig %>% layout(title = 'T', geo = g)
+fig
+
+# scatterbox bubble chart
+
+library(leaflet)
+
+mybins <- seq(0, 0.9, by = 0.1)
+mypalette <- colorBin(palette="Reds", domain=sev_rate$severity, 
+                      na.color="transparent", bins=mybins)
+
+mytext <- paste(
+    "Type: ", sev_rate$dtpv, "<br/>",
+    "Date: ", sev_rate$date, "<br/>",
+    "Severity: ", sev_rate$cas_type, sep = ""
+) %>% lapply(htmltools::HTML)
+
+m <- leaflet(sev_rate) %>% 
+    addTiles() %>% 
+    setView(lat = 59.93, lng = 30.2, zoom = 9) %>% 
+    addCircleMarkers(
+        ~latitude, ~longitude,
+        fillColor = ~mypalette(severity), fillOpacity = 0.7, color = "white",
+        radius = ~casualties, stroke = FALSE,
+        label = mytext,
+        labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),
+                                    textsize = "13px", direction = "auto")) %>% 
+    addLegend( pal=mypalette, values=~severity, opacity=0.9, 
+               title = "Severity", position = "bottomright")
+m
+
+library(htmlwidgets)
+saveWidget(m, "bubblemapQuakes.html")
+saveWidget(fig, "densityMap.html")
