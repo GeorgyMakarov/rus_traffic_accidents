@@ -45,7 +45,15 @@ sev_rate$cas_type <- as.factor(sev_rate$cas_type)
 
 sev_rate <- sev_rate %>% select(-c(driving_mode, hour, year, mmonth, mday,
                                    hhour, mminute))
-head(sev_rate)
+
+class_serious <- sev_rate %>% 
+    filter(sev_class == "serious") %>% select(cas_type)
+
+class_moderate <- sev_rate %>% 
+    filter(sev_class == "moderate") %>% select(cas_type)
+
+summary(class_serious)
+summary(class_moderate)
 
 # Analysis of frequency ---------------------------------------------------
 
@@ -66,7 +74,14 @@ ggplot(no_sleet) +
     facet_grid(vars(day), vars(road_cond)) +
     #scale_color_gradientn(colors = c("blue", "yellow", "red")) +
     theme(axis.text = element_blank(), axis.ticks = element_blank()) +
-    xlab("") + ylab("")
+    xlab("") + ylab("") + ggtitle("Casualties by time of day")
+
+# accidents by type
+
+ggplot(sev_rate) + 
+    geom_col(aes(x = dtpv, y = casualties, fill = weather_cond)) + 
+    coord_flip() + xlab("accident type") + 
+    ggtitle("Casualties by type")
 
 # severity of accident by number of participants and vehicles and types
 
@@ -151,3 +166,5 @@ m
 library(htmlwidgets)
 saveWidget(m, "bubblemapQuakes.html")
 saveWidget(fig, "densityMap.html")
+
+
