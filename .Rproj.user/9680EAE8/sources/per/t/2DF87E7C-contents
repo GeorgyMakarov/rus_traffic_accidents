@@ -682,3 +682,109 @@ due to weekend migration;
 - insufficient developement of two-lane narrow streets with natural speed limits.  
 
 
+## Modeling
+
+### Choosing features
+
+Features must correspond to data, which an emergency service operator could
+collect from a telephone call. This reduces our number of featrues to minimum:  
+- type of accident;  
+- day, month, time;  
+- district - obtained from address of an accident;  
+- number of vehicles;  
+- number of participants;  
+- road conditions.
+
+```{r long_list}
+long_list <- sev_rate %>% select(dtpv, day, month, date, time, district,
+                                 kts, kuch, road_cond, sev_class)
+
+```
+
+We need to identify the covariance of predictors. We transform factor variables
+into numerical values of their values. Then we break the data into training and
+testing sets - we use the `caret` package: *60%* goes to training set, *40%* to
+testing set.
+
+```{r}
+long_list <- long_list %>% 
+    select(-c(day, month)) %>% mutate(dtpvnum = as.numeric(dtpv),
+                                      distrnum = as.numeric(district),
+                                      roadnum = as.numeric(road_cond)) %>% 
+    mutate(mon = month(date), d = mday(date), h = hour(time))
+
+library(Hmisc)
+library(corrplot)
+library(caret)
+
+set.seed(5860)
+in_train <- createDataPartition(y = long_list$sev_class, p = 0.6, list = FALSE)
+training <- long_list[in_train,]
+testing <- long_list[-in_train,]
+
+dim(training)
+```
+
+There is an average correlation between the number of vehicles and the number of
+participants. We observe correlation between the number of vehicles and the type
+of accident. There is no other significant covariation between features. 
+Revealed raltionships between predictors correspond to the logic of the 
+phenomenon under study: in an accident with *2* or more cars the number of 
+participant increases.
+
+```{r covar_features}
+cor_data <- training[, c(5, 6, 9, 10, 11, 12, 13, 14)]
+res2 <- rcorr(as.matrix(cor_data))
+res2
+corrplot(res2$r, type = "upper", order = "hclust", 
+         p.mat = res2$P, sig.level = 0.01, insig = "pch")
+```
+
+The number of participants and the number of vehicles are not normally 
+distributed values. We do a test correlation calculation using the Spearman
+rank correlation coefficient. The calculation confirms the presence of a
+correlation between these predictors.
+
+```{r}
+spearman <- training %>% select(kts, kuch) %>% group_by(kts) %>% 
+    summarise(kuch = mean(kuch))
+
+cor.test(spearman$kts, spearman$kuch , method = "spearman")
+```
+
+The correlation between the predictors allows us to reduce the dimension of the
+dataset. Reducing the dimension results in worse interpretation of each
+predictor. In this model, interpretation plays an important role, so we will not
+reduce the number of predictors.
+
+```{r short_list}
+short_list <- training %>% select(dtpv, mon, d, h, district, kts, kuch,
+                                  road_cond, sev_class)
+dim(short_list)
+```
+
+### Metrics
+
+In this research we must predict whether an ambulance is needed at the accident.
+This a binary classification. Serious accidents require an ambulance. Moderate
+accidents do not require an ambulance. Positive value for our classifier is
+*serious* accident.
+
+If a case is classified as **false negative** the price of this mistake is
+life or health of a person. The price of **false positive** is extra cost of
+ambulance service. Increase in the number of *FN* will lead to more deaths or
+injuries, while increase in *FP* will only require more money. Therefore, the
+**Sensitivity** is critical for our model.
+
+We will also estimate classificator performance by **ROC** and **cost**. The 
+cost of the model we measure through time required to train it.
+
+### Models and training options
+
+The basic model is **GLM**, alternative models are **Decision tree** and 
+**Random forest**. We train models with repeated cross-validation on 10 folds 
+and 3 repeats. For linear regression we use the numerical values of the levels
+of factor variables. For other models we use factors. We determine the best
+model by **ROC** and **Sensitivity**.
+
+

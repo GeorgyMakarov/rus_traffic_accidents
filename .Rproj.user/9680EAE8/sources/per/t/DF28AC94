@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1591781917565.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2641377016",
+    "id" : "DF28AC94",
+    "lastKnownWriteTime" : 1592206676,
+    "last_content_update" : 1592206676021,
+    "path" : "~/GitHub/rus_traffic_accidents/modeling.R",
+    "project_path" : "modeling.R",
+    "properties" : {
+        "cursorPosition" : "153,30",
+        "scrollLine" : "140",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

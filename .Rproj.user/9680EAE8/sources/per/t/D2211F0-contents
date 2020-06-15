@@ -1,0 +1,343 @@
+# Prerequisite packages ---------------------------------------------------
+
+library(tidyverse)
+library(caret)
+library(pastecs)
+library(kernlab)
+library(lubridate)
+library(readr)
+
+# Load data ---------------------------------------------------------------
+
+setwd("C:/Users/???????/Documents/RStudio/bia")
+mydata <- read_tsv("data.zip", col_names = FALSE, col_types = NULL,
+                   locale = default_locale(), na = c("", "NA"), quoted_na = TRUE,
+                   quote = "\"", comment = "", trim_ws = TRUE, skip = 0,
+                   n_max = Inf, progress = show_progress(), skip_empty_rows = TRUE)
+
+names(mydata) <- c("customer_id", "ym", "sender_id", "receiver_id", "qty", "exc")
+mydata <- mydata %>% select(customer_id:qty)
+mydata <- mydata %>% 
+  mutate(date_t = "01") %>% 
+  mutate(date_tt = paste(ym, date_t, sep = "")) %>% 
+  mutate(date_ttt = ymd(date_tt)) %>% 
+  select(
+    customer_id = customer_id,
+    transaction_date = date_ttt,
+    sender_id = sender_id,
+    receiver_id = receiver_id,
+    qty = qty
+  )
+
+# Exploration analysis ----------------------------------------------------
+
+## check how many month or years the data covers
+
+mydata <- mydata %>% 
+  mutate(year = lubridate::year(transaction_date))
+
+str(mydata)
+unique(mydata$year)
+min(mydata$transaction_date)
+max(mydata$transaction_date)
+
+## create route as combination of sender and receiver
+
+mydata <- mydata %>% 
+  mutate(route = paste(sender_id, receiver_id, sep = "-"))
+
+## create customer and route combination
+
+mydata <- mydata %>% 
+  mutate(cust_route = paste(customer_id, route, sep = "-"))
+
+## group by transaction date and cust_route
+
+grp_dat <- mydata %>% 
+  group_by(transaction_date, cust_route) %>% 
+  summarise(qty = sum(qty))
+head(grp_dat)
+
+## check that grouping works properly
+test1 <- filter(mydata, cust_route == "1002925-31-64" & transaction_date == "2013-01-01")
+
+## check the number of unique cust_route combinations
+un_cust_rt <- unique(grp_dat$cust_route)
+length(un_cust_rt)
+
+## create recency variable
+
+grp_dat$days_since <- as.numeric(difftime(
+  time1 = "2015-07-02",
+  time2 = grp_dat$transaction_date,
+  units = "days"
+))
+
+## create dataset for rfm analysis including frequency variable
+
+customers <- grp_dat %>% 
+  group_by(cust_route) %>% 
+  summarise(
+    recency = min(days_since),
+    frequency = n(),
+    avg_qty = mean(qty),
+    first_purchase = max(days_since),
+    max_qty = max(qty)
+  )
+
+# Descriptive statistics --------------------------------------------------
+
+## descriptive overview of the dataset
+
+options(digits = 2, scipen = 99)
+stat.desc(customers)
+
+## frequency distribution
+
+ggplot(customers, aes(x = frequency)) +
+  geom_histogram(bins = 20, fill = "steelblue") +
+  theme_classic() +
+  labs(x = "frequency", title = "Order frequency") +
+  scale_x_continuous(breaks = c(0, 1, 2, 5, 10, 15, 20, 25, 30, 35))
+
+## check how many customers have made from 1 to 3 purchases
+
+for (i in 1:3) {
+  freq_dist <- dim(filter(customers, frequency == i))[1]/dim(customers)[1]
+  print(freq_dist)
+}
+
+## recency distribution
+
+ggplot(customers, aes(x = recency)) +
+  geom_histogram(bins = 20, fill = "steelblue") +
+  theme_classic() +
+  labs(x = "recency", title = "Recency in days") +
+  scale_x_continuous(breaks = c(0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000))
+
+## chech how many customers were active in 7 mths 2015 and 6 mths 2014
+
+for (i in c(212, 392)) {
+  rec_cust <- dim(filter(customers, recency <= i))[1]/dim(customers)[1]
+  print(rec_cust)
+}
+
+## average qty distribution
+
+summary(customers$avg_qty)
+
+ggplot(customers, aes(x = avg_qty)) +
+  geom_histogram(bins = 20, fill = "steelblue") +
+  theme_classic() +
+  labs(x = "qty", title = "Average purchase qty")
+
+ggplot(customers, aes(x = avg_qty)) +
+  geom_histogram(bins = 20, fill = "steelblue") +
+  theme_classic() +
+  labs(x = "qty (log10)", title = "Log transformed average purchase qty") +
+  scale_x_log10()
+
+# Key trends --------------------------------------------------------------
+
+## create year in dataset
+
+grp_dat$year_of_purchase <- as.numeric(format(grp_dat$transaction_date, "%Y"))
+
+## number of customers active in each year and corresponding annual quantities
+
+cust_data <- grp_dat
+
+active <- cust_data %>%
+  group_by(year_of_purchase) %>%
+  summarise(active_combs = length(unique(cust_route)),
+            revenues = sum(qty))
+print(active)
+
+ggplot(data = active, aes(x = year_of_purchase, y = active_combs)) +
+  geom_bar(stat = "identity", fill = 'steelblue') +
+  theme_classic() +
+  labs(x = "Year", y = "No. of customer-route combinations", title = "Flat customer growth") +
+  scale_x_continuous(breaks = c(2013, 2014, 2015))
+
+ggplot(data = active, aes(x = year_of_purchase, y = revenues/1000)) +
+  geom_line(colour = "darkred", size = 1.5) +
+  theme_gray() +
+  labs(x = "Year", y = "Revenues\n(thousands)", title = "Revenues")
+
+# Modeling ----------------------------------------------------------------
+
+## data pre-processing
+
+active_2014 <- cust_data %>% 
+  filter(year_of_purchase == 2014) %>%
+  group_by(cust_route) %>% 
+  summarise(recency = min(days_since), 
+            frequency = n(), 
+            avg_qty = mean(qty),
+            first_purchase = max(days_since),
+            max_qty = max(qty))
+
+summary(active_2014)
+
+active_2015 <- cust_data %>% 
+  filter(year_of_purchase == 2015) %>%
+  group_by(cust_route) %>% 
+  summarise(recency = min(days_since), 
+            frequency = n(), 
+            avg_qty = mean(qty),
+            first_purchase = max(days_since),
+            max_qty = max(qty))
+
+summary(active_2015)
+
+new_cust2015 <- customers %>%
+  filter(first_purchase <= 212)
+
+## remove new customers from active in 2015
+
+old_2015 <- subset(active_2015, !(active_2015$cust_route %in% new_cust2015$cust_route))
+
+## identify customers-routes active in 2014 but not in 2015 - the churners
+
+churners <- anti_join(active_2014, old_2015, by = "cust_route")
+churners
+
+
+# What if we take 2013 and 2014 combined ----------------------------------
+
+active_1314 <- cust_data %>% 
+  filter(year_of_purchase %in% c(2013, 2014)) %>%
+  group_by(cust_route) %>% 
+  summarise(recency = min(days_since), 
+            frequency = n(), 
+            avg_qty = mean(qty),
+            first_purchase = max(days_since),
+            max_qty = max(qty))
+
+summary(active_1314)
+
+churners_1 <- anti_join(active_1314, old_2015, by = "cust_route")
+churners_1
+
+# Prepare data for model fitting ------------------------------------------
+
+model_data <- mutate(active_2014, 
+                     churn = ifelse(active_2014$cust_route %in% churners$cust_route, 
+                                    "churn", "loyal"))
+
+model_data$churn <- factor(model_data$churn)
+has_rownames(model_data)
+mdt <- remove_rownames(model_data)
+model_data <- column_to_rownames(mdt, var = "cust_route")
+
+## calculate churn rate
+table(model_data$churn)
+dim(filter(model_data, churn == "churn"))[1]/dim(model_data)[1]
+
+## partition data in training and testing sets
+
+set.seed(122)
+trainIndex <- createDataPartition(model_data$churn, p = .75,
+                                  list = FALSE,
+                                  times = 1)
+head(trainIndex)
+
+train_data <- model_data[ trainIndex,]
+test_data  <- model_data[-trainIndex,]
+
+## setup train control options
+
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, 
+                     repeats = 5, 
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+## train models
+
+## Random Forest
+set.seed(122)
+rF.fit <- train(churn ~., 
+                data = train_data, 
+                method = "rf", 
+                metric = "ROC", 
+                trControl = ctrl)
+
+## cross validation settings for linear models
+ctrl_lM <- trainControl(method = "LGOCV",
+                        summaryFunction = twoClassSummary,
+                        classProbs = TRUE)
+
+## Generalized linear model
+set.seed(122)
+lM.fit <- train(churn ~ .,
+                data = train_data,
+                method = "glm",
+                metric = "ROC",
+                trControl = ctrl_lM)
+
+
+## Linear discriminant analysis
+set.seed(122)
+lda.fit <- train(churn ~ .,
+                 data = train_data,
+                 method = "lda",
+                 metric = "ROC",
+                 preProc = c("center", "scale"),
+                 trControl = ctrl_lM)
+
+## compare model results
+
+model_results1 <- resamples(list(glm = lM.fit, lda = lda.fit))
+rF.fit
+summary(model_results1)
+
+# Test model on test set --------------------------------------------------
+
+glmpred.test <- predict(lM.fit, test_data)
+cMatrix <- confusionMatrix(glmpred.test, test_data$churn)
+print(cMatrix)
+
+# Predict on total set and save result ------------------------------------
+
+model_data
+predmod.test <- predict(lM.fit, model_data)
+cMatrixM <- confusionMatrix(predmod.test, model_data$churn)
+print(cMatrixM)
+
+model_data$class <- predmod.test
+head(model_data)
+
+res_data <- model_data %>% select(class)
+head(res_data)
+
+write.csv(res_data, 'res_data.csv')
+
+# Final manual checks -----------------------------------------------------
+
+head(model_data)
+head(grp_dat)
+head(active)
+head(new_cust2015)
+
+## new customers will be loyal - add to sep list
+
+new_cust_list <- new_cust2015 %>% select(cust_route)
+head(new_cust_list)
+write.csv(new_cust_list, 'new_cust_list.csv')
+
+## check for old customers of 2013
+
+active_2013 <- cust_data %>% 
+  filter(year_of_purchase == 2013) %>%
+  group_by(cust_route) %>% 
+  summarise(recency = min(days_since), 
+            frequency = n(), 
+            avg_qty = mean(qty),
+            first_purchase = max(days_since),
+            max_qty = max(qty))
+head(active_2013)
+
+act13 <- active_2013 %>% select(cust_route)
+write.csv(act13, 'act13.csv')
+
