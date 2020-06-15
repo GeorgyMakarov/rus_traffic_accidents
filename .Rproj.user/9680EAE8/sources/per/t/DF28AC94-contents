@@ -112,66 +112,62 @@ ctrl_lm <- trainControl(method = "repeatedcv",
 
 # train lm
 
+num_list <- training %>% select(dtpvnum, mon, d, h, distrnum, 
+                                roadnum, kts, kuch, sev_class)
+lm_start <- Sys.time()
 lm.fit <- train(sev_class ~.,
                 data = short_list,
                 method = "glm",
                 metric = "ROC",
                 trControl = ctrl_lm)
+lm_stop <- Sys.time()
+lm_diff <- lm_stop - lm_start
 
 # train decision tree
 
+rpart_start <- Sys.time()
 rpart.fit <- train(sev_class ~.,
                    data = short_list,
                    method = "rpart",
                    metric = "ROC",
                    trControl = ctrl_lm)
-
-library(rattle)
-fancyRpartPlot(rpart.fit$finalModel)
-
-print(rpart.fit$finalModel)
-print(lm.fit$finalModel)
-
-# try numeric levels of factor for training a model
-
-num_list <- training %>% select(dtpvnum, mon, d, h, distrnum, 
-                                 roadnum, kts, kuch, sev_class)
-
-lmnum.fit <- train(sev_class ~.,
-                   data = num_list,
-                   method = "glm",
-                   metric = "ROC",
-                   trControl = ctrl_lm)
-
-rpartnum.fit <- train(sev_class ~.,
-                   data = num_list,
-                   method = "rpart",
-                   metric = "ROC",
-                   trControl = ctrl_lm)
-
-rpartnum.fit
-fancyRpartPlot(rpartnum.fit$finalModel)
-print(rpartnum.fit$finalModel)
-
-# there was a difference in prediction on linear model when I used numerical
-# levels instead of factors
-# there was no difference in decision tree
+rpart_stop <- Sys.time()
+rpart_diff <- rpart_stop - rpart_start
 
 # train random forest
 
-start <- Sys.time()
+rf_start <- Sys.time()
 rf.fit <- train(sev_class ~.,
                 data = short_list,
                 method = "rf",
                 metric = "ROC",
                 trControl = ctrl_lm)
-stop <- Sys.time()
+rf_stop <- Sys.time()
+rf_diff <- rf_stop - rf_start
 
-print(rf.fit$finalModel)
+#make comparison table for models
 
-lmnum.fit
-rpart.fit
-rf.fit
+lm_roc <- as.numeric(round(lm.fit$results[2], 4))
+rpart_roc <- as.numeric(round(rpart.fit$results[1, 2], 4))
+rf_roc <- as.numeric(round(rf.fit$results[2, 2], 4))
+
+lm_sens <- as.numeric(round(lm.fit$results[4], 4))
+rpart_sens <- as.numeric(round(rpart.fit$results[1, 4], 4))
+rf_sens <- as.numeric(round(rf.fit$results[2, 4], 4))
+
+compare_models <- tribble(~model, ~roc, ~sens, ~train_time,
+                          "glm", lm_roc, lm_sens, lm_diff,
+                          "rpart", rpart_roc, rpart_sens, rpart_diff,
+                          "rf", rf_roc, rf_sens, rf_diff)
+
+compare_models
+
+#plot decision tree
+
+library(rattle)
+fancyRpartPlot(rpart.fit$finalModel)
+
+
 
 # test prediction on linear model
 
