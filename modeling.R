@@ -167,41 +167,101 @@ compare_models
 library(rattle)
 fancyRpartPlot(rpart.fit$finalModel)
 
+# dealing with imbalanced dataset
 
+## make prediction on test set with rf trained on imbalanced training set
 
-# test prediction on linear model
-
-testnum_list <- testing %>% select(dtpvnum, mon, d, h, distrnum, 
-                                  roadnum, kts, kuch, sev_class)
-head(testnum_list)
-
-glm.pred <- predict(lmnum.fit, testnum_list)
-lm_cmatrix <- confusionMatrix(glm.pred, testnum_list$sev_class, positive = "serious")
-print(lm_cmatrix)
-
-# test prediction on rpart
+library(ROSE)
 
 test_list <- testing %>% select(dtpv, mon, d, h, district, kts, kuch,
-                                    road_cond, sev_class)
-head(test_list)
+                                road_cond, sev_class)
+
+rf.pred.imb <- predict(rf.fit, test_list)
+rf_cmatrix <- confusionMatrix(rf.pred.imb, test_list$sev_class, 
+                              positive = "serious")
+print(rf_cmatrix)
+roc.curve(test_list$sev_class, rf.pred.imb, plotit = FALSE) # AUC too low
+
+## check the imbalance of the dataset
+
+prop.table(table(short_list$sev_class))
+
+## use synthetic data generation to balance training dataset
+
+short_list_balanced <- ROSE(sev_class ~., data = short_list, seed = 1)$data
+table(short_list_balanced$sev_class)
+
+## train random forest on balanced dataset
+
+rfbal_start <- Sys.time()
+rf.fit.bal <- train(sev_class ~.,
+                data = short_list_balanced,
+                method = "rf",
+                metric = "ROC",
+                trControl = ctrl_lm)
+rfbal_stop <- Sys.time()
+rfbal_diff <- rfbal_stop - rfbal_start
+rfbal_diff
+
+rf.fit.bal
+print(rf.fit.bal$finalModel)
+print(rf.fit$finalModel)
+
+## check model performance on testing set
+
+rf.pred.bal <- predict(rf.fit.bal, test_list)
+rfbal_matrix <- confusionMatrix(rf.pred.bal, test_list$sev_class, 
+                                positive = "serious")
+print(rfbal_matrix)
+roc.curve(test_list$sev_class, rf.pred.bal, plotit = FALSE)
+
+## the result is not sufficient - it may be that the dataset was too small
+## try to balance dataset again
+
+short_balanced_2 <- ROSE(sev_class ~., data = short_list, seed = 1, N = 7000)$data
+table(short_balanced_2$sev_class)
+
+rfbal_start <- Sys.time()
+rf.fit.bal2 <- train(sev_class ~.,
+                    data = short_list_balanced,
+                    method = "rf",
+                    metric = "ROC",
+                    trControl = ctrl_lm)
+rfbal_stop <- Sys.time()
+rfbal_diff <- rfbal_stop - rfbal_start
+rfbal_diff
+
+rf.fit.bal2
+print(rf.fit.bal2$finalModel)
+print(rf.fit$finalModel)
+
+## check model performance on testing set with balanced model 2
+
+rf.pred.bal2 <- predict(rf.fit.bal2, test_list)
+rfbal2_matrix <- confusionMatrix(rf.pred.bal2, test_list$sev_class, 
+                                 positive = "serious")
+print(rfbal2_matrix)
+roc.curve(test_list$sev_class, rf.pred.bal2, plotit = FALSE)
+
+## this is even worse than before
+
+## try rpart
 
 rpart.pred <- predict(rpart.fit, test_list)
-rpart_cmatrix <- confusionMatrix(rpart.pred, test_list$sev_class, positive = "serious")
-print(rpart_cmatrix)
+rpart_m <- confusionMatrix(rpart.pred, test_list$sev_class, 
+                           positive = "serious")
+print(rpart_m)
+roc.curve(test_list$sev_class, rpart.pred, plotit = FALSE)
 
-# test prediction on random forest
+rpart.fit.bal <- train(sev_class ~.,
+                   data = short_list_balanced,
+                   method = "rpart",
+                   metric = "ROC",
+                   trControl = ctrl_lm)
 
-rf.pred <- predict(rf.fit, test_list)
-rf_cmatrix <- confusionMatrix(rf.pred, test_list$sev_class, positive = "serious")
-print(rf_cmatrix)
-
-# I choose decision tree to train further and tune the parameters
-# basic parameters tuning
-
-print(rpart.fit$finalModel)
-print(rpart_cmatrix)
-
-
-
-
+rpart.pred2 <- predict(rpart.fit.bal, test_list)
+rpart_m2 <- confusionMatrix(rpart.pred2, test_list$sev_class, 
+                           positive = "serious")
+print(rpart_m2)
+roc.curve(test_list$sev_class, rpart.pred2, plotit = FALSE)
 
