@@ -189,7 +189,7 @@ prop.table(table(short_list$sev_class))
 ## use synthetic data generation to balance training dataset
 
 short_list_balanced <- ROSE(sev_class ~., data = short_list, seed = 1)$data
-table(short_list_balanced$sev_class)
+prop.table(table(short_list_balanced$sev_class))
 
 ## train random forest on balanced dataset
 

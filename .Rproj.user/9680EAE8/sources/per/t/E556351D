@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1592483567090.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "96|25|153|0|\n",
+    "hash" : "3271018721",
+    "id" : "E556351D",
+    "lastKnownWriteTime" : 1592901547,
+    "last_content_update" : 1592902859395,
+    "path" : "~/GitHub/rus_traffic_accidents/tuning.R",
+    "project_path" : "tuning.R",
+    "properties" : {
+        "cursorPosition" : "272,0",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

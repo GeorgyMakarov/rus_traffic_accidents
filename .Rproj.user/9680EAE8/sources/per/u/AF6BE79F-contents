@@ -1,0 +1,7 @@
+x <- c(5, 7, 9, 11, 13)
+y <- c(6, 9, 8, 10, 15)
+dt <- data.frame(x, y)
+mod <- lm(y ~ x)
+mod
+summary(mod)
+cor(x, y)

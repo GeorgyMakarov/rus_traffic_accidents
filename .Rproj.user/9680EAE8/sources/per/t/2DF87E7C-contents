@@ -61,6 +61,8 @@ library(lubridate)
 library(readr)
 library(stringi)
 library(stringr)
+library(ROSE)
+
 ```
 
 ## Get data
@@ -848,9 +850,77 @@ compare_models <- tribble(~model, ~roc, ~sens, ~train_time,
 compare_models
 ```
 
-The choice of the model is random forest due to better performance. The check of
-decision tree performance is also required at later stage after tuning the model
-and dealing with imbalanced dataset.
+The choice of the model is decision tree due to better performance and cost of
+training combination. The check of decision tree performance is also required at 
+later stage after tuning the model and dealing with imbalanced dataset.
 
-### Dealing with imbalanced dataset
+### Imbalanced data in traffic accidents
+
+An imbalanced dataset is a dataset where one class outnumbers other class by
+a large proportion. Imbalanced datasets do not contain enough information on
+minority class for an algorithm to make an accurate prediction. It is 
+desirable to use classification algorithms with balanced datasets.
+
+Car accident dataset for Saint-Petersburg is imbalanced. Prevalance of serious
+accidents is 14.1 percent. Decision tree or random forest algorithms trained on
+this dataset return insufficient levels of sensitivity: 38 and 50 percent
+respectively.
+
+### Dealing with imbalanced data
+
+Common way to deal with imbalanced datasets is to modify data into balanced
+distribution using an algorithm. There are four algorithms available in `R`
+for balancing purpose:  
+- undersampling;  
+- oversampling;  
+- synthetic data generation;  
+- cost sensitive learning.  
+
+Undersampling method randomly kicks majority class observations from a dataset
+until both majority and minority classes are balanced. This method is 
+applicable to large datasets where reducing the number of observations benefit
+to training time. The flip side of this approach is that you might miss
+important features of majority class.
+
+Oversampling method randomly replicates minority class observations. It is good
+for relatively small datasets when you do not want to loose any valuable 
+information. The not-so-good part of the method is that it only adds 
+observations of certain types, which leads to overfitting.
+
+Synthetic data generation creates artificial dataset based on features 
+similarities. This method creates many different combinations of observed
+minority class features. The method is good as it does not lead to overfitting.
+
+Cost sensitive learning method calculates the cost of error classification for
+*FP* and *FN* - both costs result from multiplication of number of false
+classifications by their costs. Total cost tend to minimum.
+
+### Creating balanced dataset
+
+We use `ROSE` library to make balanced dataset with synthetic data generation
+approach.
+
+```{r make_balanced1}
+prop.table(table(short_list$sev_class))
+short_list_balanced <- ROSE(sev_class ~., data = short_list, seed = 1)$data
+prop.table(table(short_list_balanced$sev_class))
+```
+
+Then we train a decision tree on balanced dataset without any tuning and test
+the model on the testing set. The result of this model is our reference point 
+to model tuning.
+
+```{r test_balanced1}
+rpart.fit.bal <- train(sev_class ~.,
+                   data = short_list_balanced,
+                   method = "rpart",
+                   metric = "ROC",
+                   trControl = ctrl_lm)
+rpart.pred2 <- predict(rpart.fit.bal, test_list)
+confusionMatrix(rpart.pred2, test_list$sev_class, positive = "serious")
+roc.curve(test_list$sev_class, rpart.pred2, plotit = FALSE)
+```
+
+## Model tuning
+
 
