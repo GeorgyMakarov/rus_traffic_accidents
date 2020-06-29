@@ -62,7 +62,7 @@ library(readr)
 library(stringi)
 library(stringr)
 library(ROSE)
-
+library(rpart)
 ```
 
 ## Get data
@@ -911,6 +911,8 @@ the model on the testing set. The result of this model is our reference point
 to model tuning.
 
 ```{r test_balanced1}
+test_list <- testing %>% select(dtpv, mon, d, h, district, kts, kuch,
+                                road_cond, sev_class)
 rpart.fit.bal <- train(sev_class ~.,
                    data = short_list_balanced,
                    method = "rpart",
@@ -922,5 +924,122 @@ roc.curve(test_list$sev_class, rpart.pred2, plotit = FALSE)
 ```
 
 ## Model tuning
+
+We use three methods to tune the model: add features, tune max depth of a tree,
+tune complexity. We start from adding features to our dataset.
+
+```{r add_features}
+clean_data <- read.csv("clean_data.csv")
+clean_data <- clean_data %>% select(-X)
+clean_data <- data.frame(clean_data)
+clean_data$date <- ymd(clean_data$date)
+clean_data$time <- as.POSIXct(clean_data$time)
+clean_data <- clean_data %>% mutate(casualties = fatal + injury)
+clean_data$month <- month(clean_data$date, label = TRUE)
+clean_data$day <- wday(clean_data$date, label = TRUE)
+clean_data <- clean_data %>% mutate(cas_type = case_when(
+    fatal > 0 ~ "fatal",
+    injury > 0 ~ "injury",
+    TRUE ~ "non-injury"
+))
+
+sev_rate <- clean_data %>% 
+    mutate(kts_kuch = kts + kuch, 
+           severity = casualties / kts_kuch) %>% 
+    mutate(year = year(date),
+           mmonth = month(date),
+           mday = mday(date),
+           hhour = hour(time),
+           mminute = minute(time)) %>% 
+    mutate(timeline = make_datetime(year, mmonth, mday, hhour, mminute))
+
+sev_rate <- sev_rate %>% mutate(sev_class = case_when(
+    severity > 0.35 ~ "serious",
+    severity <= 0.35 ~ "moderate"
+))
+
+sev_rate$sev_class <- as.factor(sev_rate$sev_class)
+sev_rate$cas_type <- as.factor(sev_rate$cas_type)
+sev_rate <- sev_rate %>% select(-c(driving_mode, year, mmonth, mday,
+                                   hhour, mminute))
+
+long_list <- sev_rate %>% select(dtpv, time, district, kts, 
+                                 kuch, latitude,
+                                 longitude, weather_cond, road_cond, month,
+                                 day, sev_class)
+long_list$dtpv <- as.factor(long_list$dtpv)
+long_list$district <- as.factor(long_list$district)
+long_list$road_cond <- as.factor(long_list$road_cond)
+long_list$month <- as.numeric(long_list$month)
+long_list$day <- as.numeric(long_list$day)
+long_list$hour <- hour(long_list$time)
+long_list$minute <- minute(long_list$time)
+long_list <- long_list %>% mutate(hour_minute = hour + minute / 60)
+long_list$time <- long_list$hour_minute
+long_list <- long_list %>% select(-c(hour, minute, hour_minute))
+
+set.seed(6000)
+in_train <- createDataPartition(y = long_list$sev_class, p = 0.7, list = FALSE)
+training <- long_list[in_train,]
+testing <- long_list[-in_train,]
+
+data_rose <- ROSE(sev_class ~., data = training, seed = 1)$data
+```
+
+Now we are ready to train a model. We start from `caret` package. The length of
+the model tuning is set to *15* and we do repeated cross-validation with *10*
+repeats and *10* folds. This model results in Sensitivity of *71%* and *ROC* is
+*81.3* percent. This is much better than the original model.
+
+```{r caret_tree}
+set.seed(1)
+mod_rpart <- caret::train(sev_class ~.,
+                          method = "rpart",
+                          data = data_rose,
+                          tuneLength = 15,
+                          metric = "ROC",
+                          trControl = trainControl(method = "repeatedcv",
+                                                   number = 10,
+                                                   repeats = 10,
+                                                   summaryFunction = twoClassSummary,
+                                                   classProbs = TRUE))
+
+pred_rpart <- predict(mod_rpart, testing)
+confusionMatrix(pred_rpart, testing$sev_class, positive = "serious")
+roc.curve(testing$sev_class, pred_rpart, plotit = FALSE)
+```
+
+Lets see if we could make the model better manually. We use `rpart` library to
+tune the model further. We use complexity parameter from the best model we have
+in `caret` model. Then there is a limitation on the depth of the tree. We limit
+it to *6* with `maxdepth` parameter. We also make the tree to try split when the
+number of observations in the group is *100* or more. This is done with 
+`minsplit` parameter. Tuning results in Sensitivity of *84.3%* and *ROC* of *82.0*
+percent. This is better than the previous model.
+
+```{r model_tree}
+set.seed(1)
+mod_tree <- rpart(sev_class ~.,
+                  data = data_rose,
+                  method = "class",
+                  control = rpart.control(cp = mod_rpart$bestTune,
+                                          minsplit = 100,
+                                          maxdepth = 6))
+
+pred_tree <- predict(mod_tree, testing, type = "class")
+confusionMatrix(pred_tree, testing$sev_class, positive = "serious")
+roc.curve(testing$sev_class, pred_tree, plotit = FALSE)
+```
+
+## Conclusion
+
+Car accidents data exploration shows that Saint-Petersburg road net has many
+flashpoints, where severe car accidents happen frequently. There is a need to
+transform intersections and calm down the traffic on the streets. Understanding
+the severity of accidents could make those transformations effective.
+
+One way to understand and predict the severity of car accidents is to use the
+decision tree models. Decision tree in this research could be considered a
+good classifier to split accidents to severe and not-severe. 
 
 
