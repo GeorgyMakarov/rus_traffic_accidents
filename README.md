@@ -1,2 +1,2 @@
 # rus_traffic_accidents
-Predicting fatalities in traffic accidents using R
+Predicting traffic accidents severity in R based on open data.
